@@ -14,21 +14,15 @@
 .global INT_DIRECTOR
 _start:
 
-
 @ Setting the constants here so they are consistent throughout the program and easily adjustable.
-
-
 .equ    CM_PER_GPIO1_CLKCTRL_ADDRESS, 0x44E000AC            @ Address for the GPIO1 clock control register, for turning on GPIO1
 .equ    GPIO1_OE_ADDRESS, 0x4804C134                        @ Address for the GPIO1 output enable register, for setting USR LEDs as outputs
 .equ    GPIO1_SETDATAOUT_ADDRESS, 0x4804C194                @ Address for the GPIO1 set data out register, for setting the logic of the USR LEDs
 .equ    GPIO1_CLEARDATAOUT_ADDRESS, 0x4804C190              @ Address for the GPIO clear data out register, for clearing the logic of the USR LEDs
+
 @ Honestly, these are a little redundant because they read just fine normally, but I like keeping the style consistent.
 .equ    ONE_ENABLE_VALUE, 0x01                              @ Value for turning off bit IRQ and enabling various other modes.
 .equ    TWO_ENABLE_VALUE, 0x02                              @ Value for enabling the GPIO clocks and various other modes.
-
-
-.equ    ONE_SECOND_APPROXIMATE_LOOPS, 0x003FFFFF            @ Number of loops used to approximate one second.
-
 
 @ LED Constants
 .equ    USR3, 0x01000000                                    @ Value to light USR LED 3
@@ -36,17 +30,14 @@ _start:
 .equ    USR1, 0x00400000                                    @ Value to light USR LED 1
 .equ    USR0, 0x00200000                                    @ Value to light USR LED 0
 
-
 @ GPIO Constants
 .equ    GPIO1_FALLINGDETECT_ADDRESS, 0x4804C14C             @ Address of GPIO1_FALLINGDETECT register. Used for enabling detection of button press
 .equ    GPIO1_IRQSTATUS_SET_0_ADDRESS, 0x4804C034           @ Address of GPIO1_IRQSTATUS_SET_0 register. Used for enabling GPIO IRQ requests on POINTRPEND1
 .equ    GPIO_IRQSTATUS_0_ADDRESS, 0x4804C02C                @ Address of GPIO_IRQSTATUS_0 register. Used for determining whether the button push triggered the IRQ request and to turn off GPIO1_30 interrupt requests.
 
-
 .equ    BIT_TWO, 0x00000004                                 @ Value used to obtain the 2nd bit in the various INT registers.
 .equ    BIT_SEVEN, 0x00000080                               @ Value used for setting the seventh bit of the CPSR
 .equ    BIT_THIRTY, 0x40000000                              @ Value used to obtain the GPIO1_30 bit in various GPIO1 uses
-
 
 @ Timer Constants
 .equ    BIT_THIRTY_TWO, 0x80000000                          @ Value to enable TIMER7 interrupts in the INTC
@@ -57,23 +48,16 @@ _start:
 .equ    TIMER7_TLDR_ADDRESS, 0x4804A040                     @ Address of the TIMER7 Load register. The value of this register is loaded into the TIMER7 count register at the start after overflow
 .equ    TLDR_VALUE, 0xFFFF0000                              @ Value within the TIMER 7 TLDR register. Determines timer overflow interval; Interval Time = (0xFFFFFFFF - TLDR + 1)(Clock Period)(Clock Divider). The PS or clock divider is 1 in our case
 
-
 @ Interrupt Constants
 .equ    INTC_CONTROL_ADDRESS, 0x48200048                    @ Address of INTC_CONTROL register. Used to disable NEWIRQ bit so that the processor can respond to new IRQ.
-
-
 @       GPIO
 .equ    INTC_MIR_CLEAR3_ADDRESS, 0x482000E8                 @ Address of INTC_MIR_CLEAR3 register. Used to unmask INTC INT 98, GPIOINT1A
 .equ    INT_PENDING_IRQ3_ADDRESS, 0x482000F8                @ Address of INT_PENDING_IRQ3 register. Used to determine whether the interrupt signal came from GPIOINT1A
-
-
 @       Timer
 .equ    INTC_MIR_CLEAR2_ADDRESS, 0x482000C8                 @ Address of INTC_MIR_CLEAR2 register. Used to unmask INTC INT 95, TINT7
 .equ    INT_PENDING_IRQ2_ADDRESS, 0x482000D8                @ Address of INT_PENDING_IRQ2 register. Used to determine whether the interrupt signal came from TIMER7.
 .equ    TIMER7_IRQ_ENABLE_SET_ADDRESS, 0x4804A02C           @ Address of the TIMER7 IRQ_ENABLE_SET register. Used to enable IRQ requests during a counter overflow.
 .equ    TIMER7_IRQ_STATUS_ADDRESS, 0x4804A028               @ Address of the TIMER7 IRQ register. Used to turn the TIMER7 IRQ off so we can send additional IRQ requests.
-
-
 
 
 @ Initializing the Stacks
@@ -84,6 +68,7 @@ STACK_SETUP:
     LDR R13,=STACK2                                         @ Point to IRQ stack's base
     ADD R13, R13, #0x1000                                   @ Point to the TOP of the stack
     CPS #0x13                                               @ Switch back to SVC mode
+
 
 @ Turns on GPIO1
 GPIO_ENABLE:
@@ -119,7 +104,6 @@ IRQ_GPIO_Initialization:
 
 @ Initialize INTC
 INTC_INITIALIZATION:
-
     @ Resets INTC
     MOV R0, #TWO_ENABLE_VALUE
     LDR R1,=0x48200010
@@ -192,31 +176,20 @@ TIMER7_ENABLE:
     LDR R1,=0x4804A038
     STR R0, [R1]
 
+
 @ Make sure that the processor IRQ enabled in CPSR
+IRQ_ENABLE:
     MRS R3, CPSR                                            @ Copies the CPSR to R3
     BIC R3,#BIT_SEVEN                                       @ Clears bit 7
     MSR CPSR_c, R3                                          @ Writes back to the CPSR, only modifying the lower eight bits
 
 
-
-
-
-
 @ Program's Main Logic. Loops indefinitely
 LIGHT_LOOP: NOP
-
-
-   @ USR3 lit and turned off
-@    BL USR3                                                 @ Branch to USR3 to turn the USR3 LED ON
-@    BL FLAG_CHECK_SEND                                      @ Checks the flag and send the data to GPIO1_SETDATAOUT so the LED turns ON.
-@    BL USR_OFF                                              @ Branch to USR OFF to turn the LEDs OFF.
-
-
     B LIGHT_LOOP                                            @ Infinite cycle
 
 
-
-
+@ Handles interrupts
 INT_DIRECTOR: STMFD SP!, {R0-R3, LR}                        @ Push registers onto the stack
 
 
@@ -240,28 +213,19 @@ INT_DIRECTOR: STMFD SP!, {R0-R3, LR}                        @ Push registers ont
     BNE FLAG_CHECK_SEND                                     @ If bit 32 == 1, then timer overflow, must service LED
                                                            @ If bit 32 == 0, then go next line
 
-
 PASS_ON:
     LDMFD SP!, {R0-R3, LR}                                  @ Restore the registers on INT exceit
     SUBS PC, LR, #4                                         @ Return to Program Loop
-
-
 
 
 BUTTON_SVC:
     MOV R1, #BIT_THIRTY                                     @ The value that will turn off GPIO1_30 interrupt request/INTC interrupt request.
     STR R1, [R0]                                            @ Write to GPIO1_IRQSTATUS_0 register.
 
-
-
-
     @ Turns of NEWIRQ so that the processor can respond to new IRQs
     LDR R0,=INTC_CONTROL_ADDRESS                            @ Load address of INTC_CONTROL register,
     MOV R1, #ONE_ENABLE_VALUE                               @ Value to clear bit 0, allowing for new interrupts.
     STR R1, [R0]                                            @ Write Data to INT_CONTROL register
-
-
-
 
     @ Toggles the value of the flag.
     LDR R0,=ON_OFF_FLAG                                     @ Loads the address of the flag into R0
@@ -269,24 +233,16 @@ BUTTON_SVC:
     EOR R1, R1, #0x1                                        @ EOR's itself with 1 to toggle between 1 and zero
     STR R1, [R0]                                            @ Stores the new flag value in memory
 
-
-
-
     LDMFD SP!, {R0-R3, LR}                                  @ Restore the registers on INT exit
     SUBS PC, LR, #4                                         @ Return to Program Loop
 
 
-
-
 @ Tests the flag and writes the LED logic to GPIO1_SETDATAOUT
 FLAG_CHECK_SEND: NOP                                                   @ NOP for breakpoint. Does nothing.
-
-
     @ Turn off Timer Interrupt
     LDR R0,=TIMER7_IRQ_STATUS_ADDRESS                       @ Load address of TIMER7_IRQ_STATUS register
     MOV R1, #TWO_ENABLE_VALUE                               @ Loads the value to clear the IRQ STATUS
     STR R1, [R0]                                            @ Writes the enable value to the TIMER7_IRQ_STATUS register
-
 
     @ Flag Check
     LDR R0,=ON_OFF_FLAG                                     @ Gets the address of the flag
@@ -294,10 +250,12 @@ FLAG_CHECK_SEND: NOP                                                   @ NOP for
     TST R1, #1                                              @ Checks to see if the flag is on
     BEQ USR_OFF                                             @ If the flag is not on, Turn OFF
                                                            @ Else, go to next line
+
 USR3_ON:
     MOV R4, #USR3                                           @ Loads the value to light USR3 into register 4
     STR R4, [R6]                                            @ Write to the GPIO1_SETDATAOUT register with the current LED value (in R4)
     MOV PC, R14                                             @ Return to calling program using return address in R14
+
 
 
 @ Turns off all of the USR LEDs
@@ -307,33 +265,15 @@ USR_OFF:
     MOV PC, R14                                             @ Return to calling program using return address in R14
 
 
-
-
-@ Loops based on the value in R7.
-@ DELAY_LOOP: NOP                                             @ NOP for breakpoint. Although, it has a use here as it adds to # of instructions in the delay loop.
-@    SUBS  R7, R7, #1                                        @ Subtracts 1 from the value in R7 and places result in R7
-@    BNE DELAY_LOOP                                          @ Loops back to itself unless R7 reaches 0
-@    MOV PC, R14                                             @ Return to calling program using return address in R14
-
-
-
-
 DONE: NOP                                                   @ Nothing happens here, the program just ends. Due to the light loop. The program shouldn't reach this.
 
 
-
-
+STACK_AND_ALIGNMENT:
 .align 2
 SYS_IRQ: .WORD 0                                            @ Location of the System IRQ Address
 .data
 
-
-
-
 ON_OFF_FLAG: .byte  0x0                                     @ Sets aside a byte of memory for the flag. We don't need this much but we got weird stack errors once due to alignment and I don't really want to deal with that right now.
-
-
-
 
 .align 2
 STACK1: .rept 1024                                          @ Stack for SVC Mode
@@ -342,9 +282,6 @@ STACK1: .rept 1024                                          @ Stack for SVC Mode
 STACK2: .rept 1024                                          @ Stack for IRQ Mode
       .word 0x0000
       .endr
-
-
-
 
 .END
 
