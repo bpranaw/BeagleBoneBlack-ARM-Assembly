@@ -134,25 +134,22 @@ INTC_INITIALIZATION:
 TIMER7_ENABLE:
 
     @ Timer2 OFF - I am not sure why but timer2 is automatically enabled on my device and the 32 KHz signal there as well
-    MOV R0, #0x30000    @ Default value
-    LDR R1,=0x44E00080
-    STR R0, [R1]
-
-    MOV R0, #0x0
-    LDR R1,=0x44E00508
-    STR R0, [R1]
+@    MOV R0, #0x30000    @ Default value
+@    LDR R1,=0x44E00080
+@    STR R0, [R1]
+@    MOV R0, #0x0
+@    LDR R1,=0x44E00508
+@    STR R0, [R1]
 
     @ Turning on the clock module
     MOV R0, #TWO_ENABLE_VALUE                               @ Value to enable TIMER7 clock
     LDR R1,=CM_PER_TIMER7_CLKCTRL_ADDRESS                   @ Loads the address of the TIMER7 clock control register into R1
     STR R0, [R1]                                            @ Writes the enable clock value into the TIMER7 clock control register
 
-
     @ Selecting the 32.768 KHz clock signal
     MOV R0, #TWO_ENABLE_VALUE                               @ Value to select the 32.768 KHz signal in the multiplexer
     LDR R1,=PRCM_CLKSEL_TIMER7_CLK_ADDRESS                  @ Loads the address of TIMER7's PRCM clock select register.
     STR R0, [R1]                                            @ Writes the 32.768 KHz select value into the PRCM clock select register
-
 
     @ Resets Timer
     MOV R0, #ONE_ENABLE_VALUE                               @ Value to reset TIMER7
@@ -172,7 +169,7 @@ TIMER7_ENABLE:
     STR R0, [R1]                                            @ Stores the TLDR value into the Timer7 Count register for the initial count
 
     @   Starts the count
-    MOV R0, #ONE_ENABLE_VALUE
+    MOV R0, #0x3
     LDR R1,=0x4804A038
     STR R0, [R1]
 
@@ -191,30 +188,29 @@ LIGHT_LOOP: NOP
 
 @ Handles interrupts
 INT_DIRECTOR: STMFD SP!, {R0-R3, LR}                        @ Push registers onto the stack
-
-
-   @ GPIO Check
-@   LDR R0,=INT_PENDING_IRQ3_ADDRESS                        @ Address of INTC_PENDING_IRQ3 register
-@   LDR R1, [R0]                                            @ Read in value from INTC_PENDING_IRQ3 register
-@   TST R1, #BIT_TWO                                        @ TEST BIT 2,
-@   BEQ PASS_ON                                             @ Means signal is not from GPIOINT1A, go back to wait loop, else:
-
+    @ GPIO Check
+    LDR R0,=INT_PENDING_IRQ3_ADDRESS                        @ Address of INTC_PENDING_IRQ3 register
+    LDR R1, [R0]                                            @ Read in value from INTC_PENDING_IRQ3 register
+    TST R1, #BIT_TWO                                        @ TEST BIT 2,
+    BEQ TIMER_CHECK                                         @ Means signal is not from GPIOINT1A, go check timer, else:
 
     @ Button Check
     LDR R0,=GPIO_IRQSTATUS_0_ADDRESS                        @ Load GPIO1_IRQSTATUS_0 register address
     LDR R1, [R0]                                            @ Read in value of STATUS register
     TST R1, #BIT_THIRTY                                     @ Check if bit 30 = 1
     BNE BUTTON_SVC                                          @ If bit 30 == 1, then button pushed
-                                                           @ If bit == 0, then go to next line
+                                                            @ If bit == 0, then go to next line
+
+TIMER_CHECK:
     @ Timer Check
     LDR R0,=INT_PENDING_IRQ2_ADDRESS                        @ Address of the INT_PENDING_IRQ2 register
     LDR R1, [R0]                                            @ Read in value from INT_PENDING_IRQ2 register
     TST R1, #BIT_THIRTY_TWO                                 @ TEST BIT 32
     BNE FLAG_CHECK_SEND                                     @ If bit 32 == 1, then timer overflow, must service LED
-                                                           @ If bit 32 == 0, then go next line
+                                                            @ If bit 32 == 0, then go next line
 
 PASS_ON:
-    LDMFD SP!, {R0-R3, LR}                                  @ Restore the registers on INT exceit
+    LDMFD SP!, {R0-R3, LR}                                  @ Restore the registers on INT exit
     SUBS PC, LR, #4                                         @ Return to Program Loop
 
 
@@ -222,19 +218,19 @@ BUTTON_SVC:
     MOV R1, #BIT_THIRTY                                     @ The value that will turn off GPIO1_30 interrupt request/INTC interrupt request.
     STR R1, [R0]                                            @ Write to GPIO1_IRQSTATUS_0 register.
 
-    @ Turns of NEWIRQ so that the processor can respond to new IRQs
-    LDR R0,=INTC_CONTROL_ADDRESS                            @ Load address of INTC_CONTROL register,
-    MOV R1, #ONE_ENABLE_VALUE                               @ Value to clear bit 0, allowing for new interrupts.
-    STR R1, [R0]                                            @ Write Data to INT_CONTROL register
-
     @ Toggles the value of the flag.
     LDR R0,=ON_OFF_FLAG                                     @ Loads the address of the flag into R0
     LDR R1, [R0]                                            @ Loads the value of the flag into R1
     EOR R1, R1, #0x1                                        @ EOR's itself with 1 to toggle between 1 and zero
     STR R1, [R0]                                            @ Stores the new flag value in memory
 
-    LDMFD SP!, {R0-R3, LR}                                  @ Restore the registers on INT exit
-    SUBS PC, LR, #4                                         @ Return to Program Loop
+NEW_IRQ_ENABLE:
+    @ Turns of NEWIRQ so that the processor can respond to new IRQs
+    LDR R0,=INTC_CONTROL_ADDRESS                            @ Load address of INTC_CONTROL register,
+    MOV R1, #ONE_ENABLE_VALUE                               @ Value to clear bit 0, allowing for new interrupts.
+    STR R1, [R0]                                            @ Write Data to INT_CONTROL register
+
+    B PASS_ON                                               @ Restores registers and returns to program loop
 
 
 @ Tests the flag and writes the LED logic to GPIO1_SETDATAOUT
@@ -249,20 +245,19 @@ FLAG_CHECK_SEND: NOP                                                   @ NOP for
     LDR R1, [R0]                                            @ Loads the value of the flag
     TST R1, #1                                              @ Checks to see if the flag is on
     BEQ USR_OFF                                             @ If the flag is not on, Turn OFF
-                                                           @ Else, go to next line
+                                                            @ Else, go to next line
 
 USR3_ON:
     MOV R4, #USR3                                           @ Loads the value to light USR3 into register 4
     STR R4, [R6]                                            @ Write to the GPIO1_SETDATAOUT register with the current LED value (in R4)
-    MOV PC, R14                                             @ Return to calling program using return address in R14
-
+    B NEW_IRQ_ENABLE                                        @ Returns to enable a new IRQ in the INTC and returns to base program
 
 
 @ Turns off all of the USR LEDs
 USR_OFF:
     MOV R4, #0xFFFFFFFF                                     @ Load in word that will set all the USR LEDs OFF (we are writing to *clear* data out, so 1 results in OFF)
     STR R4, [R5]                                            @ Write to the GPIO1_CLEARDATAOUT register with the current LED value (in R4)
-    MOV PC, R14                                             @ Return to calling program using return address in R14
+    B NEW_IRQ_ENABLE                                        @ Returns to enable a new IRQ in the INTC and returns to base program
 
 
 DONE: NOP                                                   @ Nothing happens here, the program just ends. Due to the light loop. The program shouldn't reach this.
