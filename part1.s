@@ -244,7 +244,7 @@ FLAG_CHECK_SEND: NOP                                                   @ NOP for
     LDR R0,=ON_OFF_FLAG                                     @ Gets the address of the flag
     LDR R1, [R0]                                            @ Loads the value of the flag
     TST R1, #1                                              @ Checks to see if the flag is on
-    BNE USR_OFF                                             @ If the flag is not on, Turn LED OFF
+    BEQ USR_OFF                                             @ If the flag is not on, Turn LED OFF
                                                             @ Else, go to next line
 
 USR3_ON:
