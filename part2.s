@@ -1,4 +1,4 @@
-@ ECE 372 Design Project # 1
+@ ECE 372 Design Project # 1, Part 2 & 3
 @
 @ Uses Registers: R0-R3 (Used for operations), R4 (Set LED data), R5 (Send Data to CLEARDATAOUT), R6 (Send Data to SETDATAOUT)
 @
