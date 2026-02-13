@@ -1,6 +1,6 @@
-@ ECE 372 Design Project # 1
+@ ECE 372 Design Project # 1, Part 1
 @
-@ Uses Registers: R0-R3 (Used for operations), R4 (Set LED data), R5 (Send Data to CLEARDATAOUT), R6 (Send Data to SETDATAOUT), R7 (Loop counter)
+@ Uses Registers: R0-R3 (Used for operations), R4 (Set LED data), R5 (Send Data to CLEARDATAOUT), R6 (Send Data to SETDATAOUT)
 @
 @ This program lights an LED (USER LED 3) on the BeagleboneBlack Board based on the ON_OFF_FLAG. The Flag is initially zero, but can be changed by a button push on GPIO1_30
 @ which will cause an interrupt procedure that changes the flag to 1. The light will remain on as long as the Flag is set to 1.
